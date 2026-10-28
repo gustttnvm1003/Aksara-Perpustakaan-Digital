@@ -413,6 +413,7 @@ export default function App() {
   })
   const [selected, setSelected] = useState<Book | null>(null)
   const [notice, setNotice] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [catalog, setCatalog] = useState<Book[]>(loadCatalog)
   const [countPulse, setCountPulse] = useState(false)
   const prevCount = useRef(catalog.length)
@@ -724,8 +725,22 @@ export default function App() {
   }
 
   return (
-    <div className={`app-shell ${settings.compactList ? 'compact-list' : ''}`}>
-      <aside className="sidebar">
+    <div className={`app-shell ${settings.compactList ? 'compact-list' : ''} ${mobileOpen ? 'mobile-nav-open' : ''}`}>
+      {/* Overlay menu HP */}
+      <button
+        type="button"
+        className="mobile-overlay"
+        aria-label="Tutup menu"
+        onClick={() => setMobileOpen(false)}
+      />
+
+      <aside className={`sidebar ${mobileOpen ? 'is-open' : ''}`}>
+        <div className="sidebar-mobile-head">
+          <span className="sidebar-mobile-title">Menu</span>
+          <button type="button" className="sidebar-close-btn" onClick={() => setMobileOpen(false)} aria-label="Tutup">
+            ×
+          </button>
+        </div>
         <a
           className="brand"
           href="#"
@@ -751,6 +766,7 @@ export default function App() {
               className={`nav-item ${active === label ? 'active' : ''}`}
               onClick={() => {
                 setActive(label)
+                setMobileOpen(false)
                 if (label === 'Jelajahi Buku' || label === 'Beranda') {
                   setCategory('Semua buku')
                   setQuery('')
@@ -860,8 +876,18 @@ export default function App() {
 
       <main>
         <header>
-          <div className="breadcrumb">
-            Perpustakaan <span>/</span> <strong>{active}</strong>
+          <div className="header-left">
+            <button
+              type="button"
+              className="mobile-menu-btn"
+              aria-label="Buka menu"
+              onClick={() => setMobileOpen(true)}
+            >
+              <span /><span /><span />
+            </button>
+            <div className="breadcrumb">
+              Perpustakaan <span>/</span> <strong>{active}</strong>
+            </div>
           </div>
           <div className="header-right">
             <span className="date">
@@ -1694,6 +1720,47 @@ export default function App() {
           </section>
         </div>
       )}
+
+      {/* Navigasi bawah khusus HP */}
+      <nav className="mobile-bottom-nav" aria-label="Menu utama">
+        {(isAdmin
+          ? ([['home', 'Beranda'], ['book', 'Buku'], ['grid', 'Katalog'], ['settings', 'Atur']] as const)
+          : user.role === 'pustakawan'
+            ? ([['home', 'Beranda'], ['book', 'Buku'], ['grid', 'Katalog'], ['bookmark', 'Koleksi']] as const)
+            : ([['home', 'Beranda'], ['book', 'Buku'], ['bookmark', 'Koleksi'], ['clock', 'Riwayat']] as const)
+        ).map(([icon, label]) => {
+          const full =
+            label === 'Buku'
+              ? 'Jelajahi Buku'
+              : label === 'Katalog'
+                ? 'Kelola Katalog'
+                : label === 'Atur'
+                  ? 'Pengaturan'
+                  : label === 'Koleksi'
+                    ? 'Koleksi Saya'
+                    : label === 'Riwayat'
+                      ? 'Riwayat Bacaan'
+                      : label
+          return (
+            <button
+              key={label}
+              type="button"
+              className={active === full ? 'active' : ''}
+              onClick={() => {
+                setActive(full)
+                setMobileOpen(false)
+                if (full === 'Jelajahi Buku' || full === 'Beranda') {
+                  setCategory('Semua buku')
+                  setQuery('')
+                }
+              }}
+            >
+              <Icon name={icon} size={20} />
+              <span>{label}</span>
+            </button>
+          )
+        })}
+      </nav>
     </div>
   )
 }
