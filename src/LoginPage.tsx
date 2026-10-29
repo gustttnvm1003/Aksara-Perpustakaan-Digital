@@ -187,6 +187,11 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/** OTP 6 digit (demo; produksi dikirim via email/SMS) */
+function generateOtp(): string {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
+
 /** Panel branding kiri — dipakai semua tampilan auth */
 function BrandPanel() {
   return (
@@ -240,6 +245,23 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
   const [successMsg, setSuccessMsg] = useState('')
   const [failCount, setFailCount] = useState(0)
 
+  // ── OTP (login / daftar / lupa password) ─────────────────
+  const [loginPhase, setLoginPhase] = useState<'credentials' | 'otp'>('credentials')
+  const [loginOtp, setLoginOtp] = useState('')
+  const [loginOtpExpected, setLoginOtpExpected] = useState('')
+  const [pendingUser, setPendingUser] = useState<LoginUser | null>(null)
+  const [otpCooldown, setOtpCooldown] = useState(0)
+  const [otpAttempts, setOtpAttempts] = useState(0)
+
+  const [regPhase, setRegPhase] = useState<'form' | 'otp'>('form')
+  const [regOtp, setRegOtp] = useState('')
+  const [regOtpExpected, setRegOtpExpected] = useState('')
+  const [pendingReg, setPendingReg] = useState<StoredAccount | null>(null)
+
+  const [fpStep, setFpStep] = useState<'email' | 'otp' | 'reset' | 'done'>('email')
+  const [fpOtp, setFpOtp] = useState('')
+  const [fpOtpExpected, setFpOtpExpected] = useState('')
+
   // ── Register state ───────────────────────────────────────
   const [regName, setRegName] = useState('')
   const [regEmail, setRegEmail] = useState('')
@@ -258,7 +280,6 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
   const [fpEmail, setFpEmail] = useState('')
   const [fpNewPassword, setFpNewPassword] = useState('')
   const [fpConfirm, setFpConfirm] = useState('')
-  const [fpStep, setFpStep] = useState<'email' | 'reset' | 'done'>('email')
   const [showFpPw, setShowFpPw] = useState(false)
   const [fpErrors, setFpErrors] = useState<Record<string, string>>({})
   const [fpLoading, setFpLoading] = useState(false)
@@ -290,7 +311,26 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
     setLoading(false)
     setRegLoading(false)
     setFpLoading(false)
+    setLoginPhase('credentials')
+    setLoginOtp('')
+    setLoginOtpExpected('')
+    setPendingUser(null)
+    setOtpAttempts(0)
+    setOtpCooldown(0)
+    setRegPhase('form')
+    setRegOtp('')
+    setRegOtpExpected('')
+    setPendingReg(null)
+    setFpOtp('')
+    setFpOtpExpected('')
   }
+
+  // Cooldown kirim ulang OTP
+  useEffect(() => {
+    if (otpCooldown <= 0) return
+    const t = setTimeout(() => setOtpCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [otpCooldown])
 
   // ── LOGIN ────────────────────────────────────────────────
   function validateLogin(): Record<string, string> {
@@ -360,12 +400,53 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
       return
     }
 
-    setStep('done')
-    setSuccessMsg(`Login berhasil. Selamat datang, ${account.user.name}!`)
+    // Password benar → minta OTP
+    const otp = generateOtp()
+    setLoginOtpExpected(otp)
+    setPendingUser(account.user)
+    setLoginPhase('otp')
+    setLoginOtp('')
+    setOtpAttempts(0)
+    setOtpCooldown(60)
     setFailCount(0)
+    setLoading(false)
+    setStep('idle')
+    setSuccessMsg(
+      `Kode OTP telah dikirim ke email terdaftar. (Demo: gunakan kode ${otp})`,
+    )
+  }
+
+  async function handleVerifyLoginOtp(e: FormEvent) {
+    e.preventDefault()
+    setErrors({})
+    if (!loginOtp.trim() || loginOtp.trim().length < 6) {
+      setErrors({ form: 'Masukkan kode OTP 6 digit.' })
+      return
+    }
+    if (otpAttempts >= 5) {
+      setErrors({ form: 'Terlalu banyak percobaan OTP. Minta kode baru.' })
+      return
+    }
+    setLoading(true)
+    await wait(400)
+    if (loginOtp.trim() !== loginOtpExpected) {
+      const next = otpAttempts + 1
+      setOtpAttempts(next)
+      setErrors({
+        form: `Kode OTP salah. Sisa percobaan: ${Math.max(0, 5 - next)}.`,
+      })
+      setLoading(false)
+      return
+    }
+    if (!pendingUser) {
+      setErrors({ form: 'Sesi OTP tidak valid. Silakan login ulang.' })
+      setLoading(false)
+      setLoginPhase('credentials')
+      return
+    }
     if (remember) {
       try {
-        localStorage.setItem('aksara_remember', account.user.email)
+        localStorage.setItem('aksara_remember', pendingUser.email)
       } catch {
         /* abaikan */
       }
@@ -376,8 +457,21 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
         /* abaikan */
       }
     }
-    await wait(800)
-    onSuccess(account.user)
+    setSuccessMsg(`Login berhasil. Selamat datang, ${pendingUser.name}!`)
+    setStep('done')
+    await wait(600)
+    onSuccess(pendingUser)
+  }
+
+  function resendLoginOtp() {
+    if (otpCooldown > 0 || !pendingUser) return
+    const otp = generateOtp()
+    setLoginOtpExpected(otp)
+    setLoginOtp('')
+    setOtpAttempts(0)
+    setOtpCooldown(60)
+    setErrors({})
+    setSuccessMsg(`Kode OTP baru dikirim. (Demo: ${otp})`)
   }
 
   // ── REGISTER ─────────────────────────────────────────────
@@ -439,17 +533,57 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
       status: 'aktif',
     }
 
-    const list = loadRegistered()
-    list.push(account)
-    saveRegistered(list)
-
+    const otp = generateOtp()
+    setPendingReg(account)
+    setRegOtpExpected(otp)
+    setRegPhase('otp')
+    setRegOtp('')
+    setOtpCooldown(60)
     setRegLoading(false)
-    setRegSuccess('Akun berhasil dibuat! Silakan masuk dengan email atau username barumu.')
-    await wait(1200)
-    setIdentifier(email)
+    setRegSuccess(
+      `Kode OTP verifikasi telah dikirim ke ${email}. (Demo: gunakan kode ${otp})`,
+    )
+  }
+
+  async function handleVerifyRegOtp(e: FormEvent) {
+    e.preventDefault()
+    setRegErrors({})
+    if (!regOtp.trim() || regOtp.trim().length < 6) {
+      setRegErrors({ form: 'Masukkan kode OTP 6 digit.' })
+      return
+    }
+    setRegLoading(true)
+    await wait(400)
+    if (regOtp.trim() !== regOtpExpected) {
+      setRegErrors({ form: 'Kode OTP salah. Periksa email atau minta kirim ulang.' })
+      setRegLoading(false)
+      return
+    }
+    if (!pendingReg) {
+      setRegErrors({ form: 'Sesi pendaftaran tidak valid.' })
+      setRegLoading(false)
+      return
+    }
+    const list = loadRegistered()
+    list.push(pendingReg)
+    saveRegistered(list)
+    setRegLoading(false)
+    setRegSuccess('Akun berhasil diverifikasi dan dibuat! Silakan masuk.')
+    await wait(900)
+    setIdentifier(pendingReg.user.email)
     setPassword('')
     goTo('login')
     setSuccessMsg('Pendaftaran berhasil. Silakan masuk.')
+  }
+
+  function resendRegOtp() {
+    if (otpCooldown > 0 || !pendingReg) return
+    const otp = generateOtp()
+    setRegOtpExpected(otp)
+    setRegOtp('')
+    setOtpCooldown(60)
+    setRegErrors({})
+    setRegSuccess(`Kode OTP baru dikirim ke ${pendingReg.user.email}. (Demo: ${otp})`)
   }
 
   // ── FORGOT PASSWORD ──────────────────────────────────────
@@ -480,10 +614,44 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
       return
     }
 
-    // Akun demo: izinkan reset hanya di storage overlay, atau tampilkan info
     setFpFoundEmail(account.user.email)
+    const otp = generateOtp()
+    setFpOtpExpected(otp)
+    setFpOtp('')
+    setFpStep('otp')
+    setOtpCooldown(60)
+    setFpSuccess(
+      `Kode OTP dikirim ke ${account.user.email}. (Demo: ${otp}). Masukkan kode untuk lanjut reset password.`,
+    )
+  }
+
+  async function handleVerifyFpOtp(e: FormEvent) {
+    e.preventDefault()
+    setFpErrors({})
+    if (!fpOtp.trim() || fpOtp.trim().length < 6) {
+      setFpErrors({ form: 'Masukkan kode OTP 6 digit.' })
+      return
+    }
+    setFpLoading(true)
+    await wait(400)
+    if (fpOtp.trim() !== fpOtpExpected) {
+      setFpErrors({ form: 'Kode OTP salah.' })
+      setFpLoading(false)
+      return
+    }
+    setFpLoading(false)
     setFpStep('reset')
-    setFpSuccess(`Akun ditemukan: ${account.user.name}. Buat password baru di bawah.`)
+    setFpSuccess('OTP benar. Silakan buat password baru.')
+  }
+
+  function resendFpOtp() {
+    if (otpCooldown > 0 || !fpFoundEmail) return
+    const otp = generateOtp()
+    setFpOtpExpected(otp)
+    setFpOtp('')
+    setOtpCooldown(60)
+    setFpErrors({})
+    setFpSuccess(`Kode OTP baru dikirim. (Demo: ${otp})`)
   }
 
   async function handleForgotReset(e: FormEvent) {
@@ -550,8 +718,12 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
           {view === 'login' && (
             <>
               <div className="login-card-head">
-                <h2>Masuk ke Aksara</h2>
-                <p>Gunakan email, NIM, atau username anggota perpustakaan.</p>
+                <h2>{loginPhase === 'otp' ? 'Verifikasi OTP' : 'Masuk ke Aksara'}</h2>
+                <p>
+                  {loginPhase === 'otp'
+                    ? 'Masukkan kode OTP 6 digit yang dikirim ke email akunmu.'
+                    : 'Gunakan email, NIM, atau username anggota perpustakaan.'}
+                </p>
               </div>
 
               {successMsg && (
@@ -567,6 +739,7 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                 </div>
               )}
 
+              {loginPhase === 'credentials' && (
               <form className="login-form" onSubmit={handleLogin} noValidate>
                 <div className="field">
                   <label htmlFor="identifier">Email / NIM / Username</label>
@@ -673,10 +846,59 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                       {step === 'sending' ? 'Mengirim data…' : 'Memverifikasi…'}
                     </>
                   ) : (
-                    'Masuk'
+                    'Lanjut verifikasi OTP'
                   )}
                 </button>
               </form>
+              )}
+
+              {loginPhase === 'otp' && (
+              <form className="login-form" onSubmit={handleVerifyLoginOtp} noValidate>
+                <div className="field">
+                  <label htmlFor="login-otp">Kode OTP</label>
+                  <div className={`field-control otp-control ${errors.form && !successMsg ? 'has-error' : ''}`}>
+                    <span className="field-icon">
+                      <Icon name="lock" size={18} />
+                    </span>
+                    <input
+                      id="login-otp"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="6 digit"
+                      maxLength={6}
+                      value={loginOtp}
+                      onChange={(e) => {
+                        setLoginOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+                        setErrors((p) => ({ ...p, form: '' }))
+                      }}
+                      disabled={loading}
+                      className="otp-input"
+                    />
+                  </div>
+                </div>
+                <button type="submit" className="login-submit" disabled={loading}>
+                  {loading ? 'Memverifikasi…' : 'Verifikasi & masuk'}
+                </button>
+                <div className="otp-actions">
+                  <button type="button" className="link-btn primary-link" onClick={resendLoginOtp} disabled={otpCooldown > 0}>
+                    {otpCooldown > 0 ? `Kirim ulang (${otpCooldown}s)` : 'Kirim ulang OTP'}
+                  </button>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => {
+                      setLoginPhase('credentials')
+                      setSuccessMsg('')
+                      setErrors({})
+                      setPendingUser(null)
+                    }}
+                  >
+                    Kembali ke form login
+                  </button>
+                </div>
+              </form>
+              )}
 
               <p className="login-footer-text">
                 Belum punya akun?{' '}
@@ -713,6 +935,7 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                 </div>
               )}
 
+              {regPhase === 'form' && (
               <form className="login-form" onSubmit={handleRegister} noValidate>
                 <div className="field">
                   <label htmlFor="reg-name">Nama lengkap</label>
@@ -867,10 +1090,47 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                       Menyimpan akun…
                     </>
                   ) : (
-                    'Daftar sekarang'
+                    'Lanjut verifikasi OTP'
                   )}
                 </button>
               </form>
+              )}
+
+              {regPhase === 'otp' && (
+              <form className="login-form" onSubmit={handleVerifyRegOtp} noValidate>
+                <div className="field">
+                  <label htmlFor="reg-otp">Kode OTP verifikasi</label>
+                  <div className="field-control otp-control">
+                    <span className="field-icon">
+                      <Icon name="lock" size={18} />
+                    </span>
+                    <input
+                      id="reg-otp"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="6 digit"
+                      maxLength={6}
+                      value={regOtp}
+                      onChange={(e) => setRegOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      disabled={regLoading}
+                      className="otp-input"
+                    />
+                  </div>
+                </div>
+                <button type="submit" className="login-submit" disabled={regLoading}>
+                  {regLoading ? 'Memverifikasi…' : 'Verifikasi & buat akun'}
+                </button>
+                <div className="otp-actions">
+                  <button type="button" className="link-btn primary-link" onClick={resendRegOtp} disabled={otpCooldown > 0}>
+                    {otpCooldown > 0 ? `Kirim ulang (${otpCooldown}s)` : 'Kirim ulang OTP'}
+                  </button>
+                  <button type="button" className="link-btn" onClick={() => { setRegPhase('form'); setRegSuccess(''); }}>
+                    Kembali ke formulir
+                  </button>
+                </div>
+              </form>
+              )}
 
               <p className="login-footer-text">
                 Sudah punya akun?{' '}
@@ -894,6 +1154,7 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                 <p>
                   {fpStep === 'email' &&
                     'Masukkan email atau username akunmu untuk mengatur password baru.'}
+                  {fpStep === 'otp' && 'Masukkan kode OTP 6 digit yang dikirim ke emailmu.'}
                   {fpStep === 'reset' && 'Buat password baru untuk akun yang ditemukan.'}
                   {fpStep === 'done' && 'Password sudah diperbarui.'}
                 </p>
@@ -945,6 +1206,39 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                       'Lanjutkan'
                     )}
                   </button>
+                </form>
+              )}
+
+              {fpStep === 'otp' && (
+                <form className="login-form" onSubmit={handleVerifyFpOtp} noValidate>
+                  <div className="field">
+                    <label htmlFor="fp-otp">Kode OTP</label>
+                    <div className="field-control otp-control">
+                      <span className="field-icon">
+                        <Icon name="lock" size={18} />
+                      </span>
+                      <input
+                        id="fp-otp"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        placeholder="6 digit"
+                        maxLength={6}
+                        value={fpOtp}
+                        onChange={(e) => setFpOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        disabled={fpLoading}
+                        className="otp-input"
+                      />
+                    </div>
+                  </div>
+                  <button type="submit" className="login-submit" disabled={fpLoading}>
+                    {fpLoading ? 'Memverifikasi…' : 'Verifikasi OTP'}
+                  </button>
+                  <div className="otp-actions">
+                    <button type="button" className="link-btn primary-link" onClick={resendFpOtp} disabled={otpCooldown > 0}>
+                      {otpCooldown > 0 ? `Kirim ulang (${otpCooldown}s)` : 'Kirim ulang OTP'}
+                    </button>
+                  </div>
                 </form>
               )}
 
