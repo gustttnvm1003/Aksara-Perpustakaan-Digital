@@ -846,7 +846,7 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                       {step === 'sending' ? 'Mengirim data…' : 'Memverifikasi…'}
                     </>
                   ) : (
-                    'Lanjut verifikasi OTP'
+                    'Lanjut'
                   )}
                 </button>
               </form>
@@ -1090,7 +1090,7 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                       Menyimpan akun…
                     </>
                   ) : (
-                    'Lanjut verifikasi OTP'
+                    'Lanjut'
                   )}
                 </button>
               </form>
