@@ -1,0 +1,125 @@
+// Prisma schema — Aksara Perpustakaan Digital
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  anggota
+  pustakawan
+  admin
+}
+
+enum EmailType {
+  referral
+  reset_password
+  verification
+  other
+}
+
+enum EmailStatus {
+  pending
+  sent
+  failed
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         UserRole @default(anggota)
+  initials     String?
+  avatar       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  emailLogs       EmailLog[]
+  referralCodes   ReferralCode[]
+  passwordResets  PasswordResetCode[]
+  sessions        Session[]
+}
+
+model EmailLog {
+  id             String      @id @default(cuid())
+  userId         String?
+  recipientEmail String
+  subject        String
+  body           String      @db.Text
+  type           EmailType   @default(other)
+  status         EmailStatus @default(pending)
+  errorMessage   String?
+  sentAt         DateTime?
+  createdAt      DateTime    @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([recipientEmail])
+  @@index([type, status])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ReferralCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  userId    String
+  email     String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  lockedUntil DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([email])
+  @@index([expiresAt])
+}
+
+model PasswordResetCode {
+  id          String    @id @default(cuid())
+  userId      String
+  codeHash    String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  attempts    Int       @default(0)
+  lockedUntil DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Rate limit sederhana per key (email atau IP)
+model RateLimit {
+  id        String   @id @default(cuid())
+  key       String
+  action    String
+  count     Int      @default(1)
+  windowStart DateTime @default(now())
+
+  @@unique([key, action])
+  @@index([windowStart])
+}

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react'
 import LoginPage, { type LoginUser } from './LoginPage'
+import EmailHistoryPage from './pages/EmailHistoryPage'
+import ReferralPage from './pages/ReferralPage'
 
 function Icon({ name, size = 20 }: { name: string; size?: number }) {
   const paths: Record<string, React.ReactNode> = {
@@ -86,6 +88,18 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
       <>
         <circle cx="12" cy="12" r="9" />
         <path d="M12 10v6m0-8h.01" />
+      </>
+    ),
+    mail: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="m3 7 9 7 9-7" />
+      </>
+    ),
+    gift: (
+      <>
+        <rect x="3" y="10" width="18" height="11" rx="1" />
+        <path d="M12 10v11M3 14h18M12 10c-2-3-5-4-5-2s2 2 5 2c3 0 5-1 5-2s-3 0-5 2Z" />
       </>
     ),
     camera: (
@@ -694,6 +708,7 @@ export default function App() {
         ['home', 'Beranda'],
         ['book', 'Jelajahi Buku'],
         ['grid', 'Kelola Katalog'],
+        ['mail', 'Riwayat Email'],
         ['settings', 'Pengaturan'],
         ['help', 'Bantuan'],
         ['info', 'Tentang'],
@@ -704,6 +719,8 @@ export default function App() {
           ['book', 'Jelajahi Buku'],
           ['grid', 'Kelola Katalog'],
           ['bookmark', 'Koleksi Saya'],
+          ['gift', 'Kode Referral'],
+          ['mail', 'Riwayat Email'],
           ['settings', 'Pengaturan'],
           ['help', 'Bantuan'],
           ['info', 'Tentang'],
@@ -713,6 +730,8 @@ export default function App() {
           ['book', 'Jelajahi Buku'],
           ['bookmark', 'Koleksi Saya'],
           ['clock', 'Riwayat Bacaan'],
+          ['gift', 'Kode Referral'],
+          ['mail', 'Riwayat Email'],
           ['settings', 'Pengaturan'],
           ['help', 'Bantuan'],
           ['info', 'Tentang'],
@@ -964,6 +983,9 @@ export default function App() {
         <div className="content">
           <div key={active} className="page-transition">
           {/* ========== PENGATURAN ========== */}
+          {active === 'Riwayat Email' && <EmailHistoryPage isAdmin={isAdmin} />}
+          {active === 'Kode Referral' && <ReferralPage />}
+
           {active === 'Pengaturan' && (
             <section className="page-panel">
               <div className="page-panel-head">

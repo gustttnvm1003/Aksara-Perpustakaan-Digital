@@ -765,3 +765,18 @@
     font-size: 1.35rem !important;
   }
 }
+
+
+.filter-bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.filter-bar input,.filter-bar select{border:1px solid #dfe5df;border-radius:10px;padding:10px 12px;font:inherit;font-size:14px;background:#fff;color:#273b35}
+.filter-bar input{flex:1;min-width:160px}
+.table-wrap{overflow-x:auto;border:1px solid #e6eae4;border-radius:12px;background:#fff}
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th,.data-table td{padding:12px 14px;text-align:left;border-bottom:1px solid #edf0e9}
+.data-table th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#8d958e;background:#f7f9f6}
+.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#edf0e9;font-size:11px;font-weight:600}
+.pill.status-sent{background:#edf3ed;color:#245943}
+.pill.status-failed{background:#fdf2f0;color:#9b3b2e}
+.pager{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:16px;font-size:14px}
+.pager button{border:1px solid #e6eae4;background:#fff;border-radius:8px;padding:8px 14px;font:inherit;font-size:13px}
+.pager button:disabled{opacity:.45}

@@ -1,39 +1,44 @@
 # Aksara — Perpustakaan Digital
 
-Website perpustakaan digital (frontend React + Vite + Tailwind).
+Website perpustakaan digital (React + Vite) + backend API (Express + Prisma + Supabase/PostgreSQL).
 
-## Fitur
-- Login (Input → Proses → Output) dengan validasi & akun demo
-- Menu profil: **Edit profil** dan **Keluar dari akun**
-- Statistik **Buku digital tersedia** realtime dari katalog
-- Tambah buku (pustakawan/admin) — angka ikut naik
-- Sesi tersimpan (refresh tidak logout); katalog & koleksi di localStorage
+## Struktur
+- `src/` — frontend (login, katalog, mobile UI, riwayat email, referral)
+- `server/` — API email, referral, reset password
+- `.env` — konfigurasi frontend
+- `server/.env` — konfigurasi backend + Supabase + SMTP + OTP
 
-## Akun demo
+## Setup cepat
+
+### 1. Frontend
+```bash
+cd aksara
+cp .env.example .env
+# isi VITE_API_URL=http://localhost:3000 dan kunci Supabase anon (opsional)
+npm install
+npm run dev
+```
+
+### 2. Backend
+```bash
+cd aksara/server
+cp .env.example .env
+# isi DATABASE_URL (Supabase), SUPABASE_*, SESSION_SECRET, JWT_SECRET, SMTP_*
+npm install
+npx prisma generate
+npx prisma db push
+npm run dev
+```
+
+API default: http://localhost:3000  
+UI default: http://localhost:5173
+
+## Env penting
+Lihat `.env.example` dan `server/.env.example` (sudah digabung dengan login OTP, Supabase, SMTP, Fonnte).
+
+## Akun demo (frontend simulasi)
 | Peran | Login | Password |
 |-------|--------|----------|
 | Anggota | aditya@aksara.id | Aksara123 |
 | Pustakawan | pustakawan@aksara.id | Aksara123 |
 | Admin | admin@aksara.id | Aksara123 |
-
-## Pengembangan lokal
-```bash
-npm install
-npm run dev
-```
-
-## Build produksi (siap hosting)
-```bash
-npm install
-npm run build
-```
-Hasil ada di folder `dist/`. Unggah **seluruh isi** `dist/` ke hosting statis.
-
-### Opsi hosting
-- **Netlify / Cloudflare Pages**: drag folder `dist`, atau hubungkan repo. File `public/_redirects` ikut ter-copy.
-- **Vercel**: `vercel.json` sudah disiapkan.
-- **GitHub Pages / hosting biasa**: `base: './'` di Vite agar path aset relatif aman.
-- Pratinjau lokal hasil build: `npm run preview`
-
-## Catatan
-Prototipe frontend (autentikasi & data di browser). Siap dilanjutkan ke API backend.

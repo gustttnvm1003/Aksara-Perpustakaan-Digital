@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 dist/
 dist-ssr/
 .vite/
@@ -6,8 +6,9 @@ dist-ssr/
 *.log
 npm-debug.log*
 .env
-.env.*
-!.env.example
+.env.local
+server/.env
+server/node_modules/
 .DS_Store
 Thumbs.db
 .idea/
